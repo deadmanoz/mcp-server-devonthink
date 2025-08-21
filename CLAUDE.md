@@ -6,8 +6,8 @@
 
 ## Project Structure
 
-- **`src/index.ts`**: The main entry point for the CLI application. It sets up a `StdioServerTransport` for communication.
-- **`src/sse.ts`**: An alternative entry point that uses an `SSEServerTransport` with Express, allowing the server to communicate over HTTP.
+- **`src/index.ts`**: The main entry point for the CLI application. It sets up a `StdioServerTransport` for local communication.
+- **`src/sse.ts`**: Network-accessible SSE (Server-Sent Events) server that enables remote Claude Code instances to access DEVONthink over the local network. Uses Express with `SSEServerTransport` for HTTP-based communication.
 - **`src/devonthink.ts`**: The core server logic. It creates and configures the MCP server, defines request handlers for listing and calling tools, and manages the available tools.
 - **`src/tools/`**: Directory containing all tool implementations
   - **`isRunning.ts`**: Defines the `is_running` tool, which checks if DEVONthink is active
@@ -194,6 +194,59 @@ Update this `CLAUDE.md` file to:
 ### DEVONthink API Reference
 
 Refer to `docs/devonthink-javascript-2.md` for comprehensive documentation of available DEVONthink JXA commands and properties.
+
+## Network Access (2025-08)
+
+### SSE Server for Remote Access
+
+The MCP server can now be accessed remotely over the network using Server-Sent Events (SSE) transport. This enables Claude Code instances on different machines to access DEVONthink running on your Mac.
+
+#### Usage
+
+**Start the network server:**
+```bash
+# Start SSE server on default port 8429
+just network
+
+# Or with custom port
+just network-port 3001
+
+# Or with custom host and port
+just network-custom 192.168.1.100 3001
+```
+
+**Configure remote Claude Code:**
+```bash
+# On remote machine, add the MCP server
+claude mcp add --transport sse devonthink http://YOUR_MAC_IP:8429/sse
+
+# Verify connection
+claude mcp list
+```
+
+#### Features
+
+- **Multi-client support**: Multiple Claude Code instances can connect simultaneously
+- **Session management**: Each connection gets a unique session with proper cleanup
+- **Network binding**: Server listens on `0.0.0.0` for network access
+- **CORS enabled**: Cross-origin requests supported for browser-based clients
+- **Health monitoring**: `/health` endpoint for connection verification
+
+#### Architecture
+
+- **Port 8429**: Default SSE server port (DEVONthink = DT = 8429)
+- **Endpoints**:
+  - `GET /sse` - SSE connection endpoint
+  - `POST /message` - JSON-RPC message handling
+  - `GET /health` - Health check endpoint
+- **Session-based routing**: Each SSE connection gets a unique session ID for message routing
+- **Per-connection servers**: Each remote connection gets its own MCP server instance
+
+#### Critical Implementation Details
+
+- **Request body handling**: Must pass `req.body` as third parameter to `transport.handlePostMessage(req, res, req.body)` to prevent "stream is not readable" errors when using Express.json() middleware
+- **MCP SDK version**: Requires `@modelcontextprotocol/sdk` >= 1.17.3 for protocol version compatibility
+- **Protocol version**: Server supports MCP protocol version `2025-06-18`
 
 ## Recent Improvements (2025-07)
 
