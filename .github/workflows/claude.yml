@@ -1,0 +1,73 @@
+name: DEVONthink MCP Server - Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code for DEVONthink MCP Server
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          
+          # This is an optional setting that allows Claude to read CI results on PRs
+          additional_permissions: |
+            actions: read
+
+          prompt: |
+            You are working on the DEVONthink MCP (Model Context Protocol) server project. This is a TypeScript/Node.js project that provides tools for interacting with DEVONthink through the MCP protocol.
+
+            **CRITICAL PROJECT CONTEXT:**
+            - This is a DEVONthink MCP server that uses JXA (JavaScript for Automation) for DEVONthink integration
+            - All changes MUST pass `npm test` and `npm run build` before being considered complete
+            - Follow ALL patterns and best practices documented in CLAUDE.md, especially JXA limitations and string escaping
+            - The project has 26+ tools for DEVONthink operations (search, import, record management, etc.)
+            - Import tools use DEVONthink's native functionality to handle all file types safely
+
+            **IMPORTANT REQUIREMENTS:**
+            1. Always reference CLAUDE.md for project conventions, JXA best practices, and tool development patterns
+            2. Follow the JXA interpreter limitations (use bracket notation for objects, no console.log, proper error handling)
+            3. Use proper string escaping with escapeStringForJXA utility for all user inputs
+            4. Test all changes with `npm test` and `npm run build`
+            5. For new tools, follow the established patterns in src/tools/ directory
+            6. Import tools should preserve file metadata and handle encoding properly
+
+            **KEY FOCUS AREAS:**
+            - MCP tool development and testing
+            - JXA script safety and proper object handling
+            - Import functionality (import_file, import_directory, import_with_options)
+            - DEVONthink path vs filesystem path distinction
+            - Error handling and user input validation
+
+            Use the repository's CLAUDE.md as your primary reference for all development decisions and patterns.
+
+          # MCP server specific configuration and allowed tools
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
+          claude_args: --model claude-opus-4-1-20250805 --allowed-tools "Bash(npm test:*),Bash(npm run build:*),Bash(npm run type-check:*),Bash(gh pr:*),Bash(gh issue:*),Bash(just:*)"

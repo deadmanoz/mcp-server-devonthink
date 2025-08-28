@@ -1,0 +1,92 @@
+name: DEVONthink MCP Server - Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    # Focus on TypeScript source files and key configuration files
+    paths:
+      - src/**/*.ts
+      - src/**/*.js
+      - package.json
+      - tsconfig.json
+      - vitest.config.ts
+      - CLAUDE.md
+
+jobs:
+  claude-review:
+    # Run review for all PRs to ensure MCP server standards are maintained
+    
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run DEVONthink MCP Server Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Please review this DEVONthink MCP (Model Context Protocol) server pull request with focus on project-specific requirements.
+
+            **CRITICAL REVIEW AREAS:**
+
+            1. **MCP Tool Implementation Standards:**
+               - Follows established patterns in src/tools/ directory
+               - Proper Zod schema validation for inputs
+               - Correct Tool interface implementation with run() method
+               - Tool added to main server tools array in src/devonthink.ts
+
+            2. **JXA Script Safety (CRITICAL for DEVONthink integration):**
+               - Uses bracket notation for object properties (NOT object literals)
+               - No console.log statements (causes MCP stdio errors)
+               - Proper error handling with try/catch and JSON response format
+               - No direct object literal returns (build objects with bracket notation)
+               - Proper string escaping using escapeStringForJXA utility
+
+            3. **DEVONthink Integration Best Practices:**
+               - Correct usage of DEVONthink location paths vs filesystem paths
+               - Proper UUID vs ID+Database handling for record identification
+               - Import tools use native DEVONthink functionality
+               - Error messages include specific context (record ID, database name, etc.)
+
+            4. **Security and Input Validation:**
+               - All user inputs properly escaped to prevent JXA script injection
+               - Validation rejects problematic control characters
+               - No exposure of sensitive information in error messages
+               - Proper handling of edge cases (closed databases, missing records)
+
+            5. **Testing and Build Requirements:**
+               - Changes must pass `npm test` and `npm run build`
+               - Vitest test patterns followed if tests added
+               - TypeScript types properly defined
+               - No breaking changes to existing tool interfaces
+
+            6. **Import Tool Specific Reviews (if applicable):**
+               - Proper file metadata preservation
+               - Correct encoding handling for all file types
+               - Batch processing efficiency
+               - Duplicate detection and handling
+               - Error recovery for problematic files
+
+            7. **Code Quality Standards:**
+               - TypeScript best practices
+               - Proper async/await usage with executeJxa calls
+               - Clear variable naming and function structure
+               - Consistent error response formats
+
+            **REFERENCE CLAUDE.md EXTENSIVELY** - It contains comprehensive project-specific guidelines, JXA limitations, troubleshooting guides, and implementation patterns that are critical for this project.
+
+            Use `gh pr comment` with your Bash tool to leave detailed, constructive feedback focusing on these MCP server specific concerns.
+          
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
+          claude_args: --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(npm test:*),Bash(npm run build:*)"
